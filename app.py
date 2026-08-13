@@ -1,44 +1,52 @@
 import requests
 import sys
+import os
 
-# Rajarhat coordinates
-LAT = 22.6148
-LON = 88.4326
+# Grab the secrets securely passed by GitHub Actions
+TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
-print("Fetching weather and air quality data...")
+LAT = 26.1722
+LON = 91.7458
 
-# 1. Get Weather Data
-weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&current=temperature_2m,precipitation"
-w_data = requests.get(weather_url).json()
+print("Fetching forecast for the next 12 hours...")
 
-# SAFETY CHECK: Did the API return an error instead of weather data?
-if 'current' not in w_data:
-    print("❌ API Error! The Weather API did not return the expected data.")
-    print("Raw API Response:", w_data)
+url = f"https://api.open-meteo.com/v1/forecast?latitude={LAT}&longitude={LON}&hourly=precipitation,weathercode&forecast_hours=12"
+data = requests.get(url).json()
+
+if 'hourly' not in data:
+    print("❌ API Error!")
     sys.exit(1)
 
-temp = w_data['current']['temperature_2m']
-precip = w_data['current']['precipitation']
+precip_list = data['hourly']['precipitation']
+codes_list = data['hourly']['weathercode']
 
-# 2. Get Air Quality (AQI) Data
-aq_url = f"https://air-quality-api.open-meteo.com/v1/air-quality?latitude={LAT}&longitude={LON}&current=us_aqi"
-aq_data = requests.get(aq_url).json()
+bad_weather_detected = False
+alert_message = ""
 
-# SAFETY CHECK: Did the API return an error instead of AQI data?
-if 'current' not in aq_data:
-    print("❌ API Error! The AQI API did not return the expected data.")
-    print("Raw API Response:", aq_data)
-    sys.exit(1)
+for i in range(12):
+    precip = precip_list[i]
+    code = codes_list[i]
+    
+    if precip > 5.0 or code in [65, 95, 96, 99]:
+        bad_weather_detected = True
+        hour_word = "hours" if i != 1 else "hour"
+        alert_message = f"🚨 *Weather Alert for Rajarhat* 🚨\nHeavy Rain or Thunderstorm expected in about {i} {hour_word}!"
+        break
 
-aqi = aq_data['current']['us_aqi']
-
-print(f"🌡️ Current Temperature: {temp}°C")
-print(f"🌧️ Precipitation: {precip} mm")
-print(f"🌫️ Air Quality Index (AQI): {aqi}")
-
-# 3. Evaluate and Alert
-if precip > 0 or aqi > 100:
-    print("⚠️ ALERT CONDITION MET: Bad weather or smog detected!")
-    sys.exit(1)
+if bad_weather_detected:
+    print("⚠️ Bad weather detected! Sending Telegram alert...")
+    
+    # Send the message via Telegram API
+    tg_url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+    payload = {
+        "chat_id": TELEGRAM_CHAT_ID,
+        "text": alert_message,
+        "parse_mode": "Markdown"
+    }
+    requests.post(tg_url, json=payload)
+    
+    # We exit cleanly now (exit code 0) so the pipeline stays green!
+    sys.exit(0)
 else:
-    print("✅ Weather is clear and air is good. Have a great day!")
+    print("✅ Forecast clear. No alert sent.")
