@@ -31,7 +31,7 @@ for i in range(12):
     if precip > 5.0 or code in [65, 95, 96, 99]:
         bad_weather_detected = True
         hour_word = "hours" if i != 1 else "hour"
-        alert_message = f"🚨 *Weather Alert for Guwahatiß* 🚨\nHeavy Rain or Thunderstorm expected in about {i} {hour_word}!"
+        alert_message = f"🚨 *Weather Alert for Guwahati* 🚨\nHeavy Rain or Thunderstorm expected in about {i} {hour_word}!"
         break
 
 if bad_weather_detected:
